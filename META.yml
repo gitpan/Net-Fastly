@@ -1,0 +1,79 @@
+---
+abstract: 'client library for interacting with the Fastly web acceleration service'
+author:
+  - unknown
+build_requires: {}
+configure_requires:
+  Module::Build: 0.38
+dynamic_config: 1
+generated_by: 'Module::Build version 0.38, CPAN::Meta::Converter version 2.110930'
+license: unknown
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Net-Fastly
+provides:
+  Net::Fastly:
+    file: lib/Net/Fastly.pm
+    version: 0.5
+  Net::Fastly::Backend:
+    file: lib/Net/Fastly/Backend.pm
+    version: 0
+  Net::Fastly::BelongsToServiceAndVersion:
+    file: lib/Net/Fastly/BelongsToServiceAndVersion.pm
+    version: 0
+  Net::Fastly::Client:
+    file: lib/Net/Fastly/Client.pm
+    version: 0
+  Net::Fastly::Client::UserAgent:
+    file: lib/Net/Fastly/Client.pm
+    version: 0
+  Net::Fastly::Customer:
+    file: lib/Net/Fastly/Customer.pm
+    version: 0
+  Net::Fastly::Director:
+    file: lib/Net/Fastly/Director.pm
+    version: 0
+  Net::Fastly::Domain:
+    file: lib/Net/Fastly/Domain.pm
+    version: 0
+  Net::Fastly::Invoice:
+    file: lib/Net/Fastly/Invoice.pm
+    version: 0
+  Net::Fastly::Model:
+    file: lib/Net/Fastly/Model.pm
+    version: 0
+  Net::Fastly::Origin:
+    file: lib/Net/Fastly/Origin.pm
+    version: 0
+  Net::Fastly::Service:
+    file: lib/Net/Fastly/Service.pm
+    version: 0
+  Net::Fastly::Settings:
+    file: lib/Net/Fastly/Settings.pm
+    version: 0
+  Net::Fastly::UA:
+    file: lib/Net/Fastly/Client.pm
+    version: 0
+  Net::Fastly::User:
+    file: lib/Net/Fastly/User.pm
+    version: 0
+  Net::Fastly::VCL:
+    file: lib/Net/Fastly/VCL.pm
+    version: 0
+  Net::Fastly::Version:
+    file: lib/Net/Fastly/Version.pm
+    version: 0
+requires:
+  Class::Accessor::Fast: 0
+  DateTime: 0
+  File::Basename: 0
+  File::Spec: 0
+  File::Temp: 0
+  JSON::Any: 0
+  JSON::XS: 0
+  LWP::UserAgent: 6.02
+  Term::ANSIColor: 0
+  Term::ShellUI: 0
+  Test::More: 0
+version: 0.5
