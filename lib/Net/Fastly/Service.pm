@@ -23,6 +23,10 @@ The id of the customer this belongs to
 
 The name of this service
 
+=head2 comment 
+
+a free form comment field
+
 =cut
 
 =head1 METHODS
@@ -107,10 +111,7 @@ sub versions {
         my $v = $versions->{$number};
         push @versions, Net::Fastly::Version->new($fetcher, service_id => $self->id, 
                                                             number     => $number, 
-                                                            comment    => $v->{comment} || "",
-                                                            created_at => $v->{created},
-                                                            updated_at => $v->{updated},
-                                                            deleted_at => $v->{deleted});
+                                                            comment    => $v->{comment} || "");
     }
     return sort { $a->number <=> $b->number } @versions;
 }

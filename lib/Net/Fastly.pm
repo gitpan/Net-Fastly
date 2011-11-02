@@ -7,14 +7,15 @@ use Net::Fastly::Client;
 use Net::Fastly::Invoice;
 use Net::Fastly::Settings;
 
-our $VERSION = "0.5";
+our $VERSION = "0.6";
 
 
 BEGIN {
   no strict 'refs';
-  foreach my $class (qw(Net::Fastly::User     Net::Fastly::Customer Net::Fastly::Backend
-                        Net::Fastly::Director Net::Fastly::Domain 
-                        Net::Fastly::Origin   Net::Fastly::Service 
+  foreach my $class (qw(Net::Fastly::User     Net::Fastly::Customer
+                        Net::Fastly::Backend  Net::Fastly::Director
+                        Net::Fastly::Domain   Net::Fastly::Match
+                        Net::Fastly::Origin   Net::Fastly::Service
                         Net::Fastly::VCL      Net::Fastly::Version)) {
     
     my $file = $class . '.pm';
@@ -199,15 +200,17 @@ sub purge {
 
 =head2 create_version service_id => <service id>, [opts]
 
-=head2 create_backend service_id => <service id>, version => <version number>, <opts>
+=head2 create_backend service_id => <service id>, version => <version number>, name => <name> <opts>
 
-=head2 create_director service_id => <service id>, version => <version number> <opts>
+=head2 create_director service_id => <service id>, version => <version number>, name => <name> <opts>
 
-=head2 create_domain service_id => <service id>, version => <version number> <opts>
+=head2 create_domain service_id => <service id>, version => <version number>, name => <name> <opts>
 
-=head2 create_origin service_id => <service id>, version => <version number> <opts>
+=head2 create_match service_id => <service id>, version => <version number>, name => <name> <opts>
 
-=head2 create_vcl service_id => <service id>, version => <version number> <opts>
+=head2 create_origin service_id => <service id>, version => <version number>, name => <name> <opts>
+
+=head2 create_vcl service_id => <service id>, version => <version number>, name => <name> <opts>
 
 Create new objects.
 
@@ -226,6 +229,8 @@ Create new objects.
 =head2 get_director <service id> <version number> <name>
 
 =head2 get_domain <service id> <version number> <name>
+
+=head2 get_match <service id> <version number> <name>
 
 =head2 get_origin <service id> <version number> <name>
 
@@ -253,6 +258,8 @@ Get existing objects.
 =head2 update_director <obj>
 
 =head2 update_domain <obj>
+
+=head2 update_match <obj>
 
 =head2 update_origin <obj>
 
@@ -284,6 +291,8 @@ Note - you can also do
 =head2 delete_director <obj>
 
 =head2 delete_domain <obj>
+
+=head2 delete_match <obj>
 
 =head2 delete_origin <obj>
 
@@ -332,7 +341,7 @@ sub _list {
     my $class    = shift;
     my %opts     = @_;
     die "You must be fully authed to list a $class" unless $self->fully_authed;
-    my $list     = $self->client->_get($class->_list_path, %opts, is_list => 1);
+    my $list     = $self->client->_get($class->_list_path, %opts);
     return () unless $list;
     return map { $class->new($self, %$_) } @$list;
 }
@@ -429,6 +438,7 @@ sub get_options {
     foreach my $config (@configs) {
         next unless -f $config;
         %options = load_options($config);
+        last;
     }
     while (@ARGV && $ARGV[0] =~ m!^-+(\w+)\=(\w+)$!) {
         $options{$1} = $2;

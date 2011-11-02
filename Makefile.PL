@@ -7,11 +7,11 @@ WriteMakefile
   'NAME' => 'Net::Fastly',
   'EXE_FILES' => [
                    'bin/fastly',
+                   'bin/fastly_speed_test',
                    'bin/fastly_upload_vcl'
                  ],
   'VERSION_FROM' => 'lib/Net/Fastly.pm',
   'PREREQ_PM' => {
-                   'DateTime' => 0,
                    'Term::ANSIColor' => 0,
                    'File::Spec' => 0,
                    'JSON::XS' => 0,
