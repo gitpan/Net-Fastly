@@ -105,14 +105,7 @@ sub versions {
     my $self  = shift;
     die "You must be authed to get the versions for a service" unless $self->_fetcher->authed;
     my $fetcher  = $self->_fetcher;
-    my $versions = $self->{versions};
-    my @versions;
-    foreach my $number (keys %$versions) {
-        my $v = $versions->{$number};
-        push @versions, Net::Fastly::Version->new($fetcher, service_id => $self->id, 
-                                                            number     => $number, 
-                                                            comment    => $v->{comment} || "");
-    }
+    my @versions = map { Net::Fastly::Version->new($fetcher, %$_) } @{$self->{versions}||[]};
     return sort { $a->number <=> $b->number } @versions;
 }
 
@@ -129,12 +122,6 @@ sub version {
 }
 
 package Net::Fastly;
-
-sub list_services {
-    my $self  = shift;
-    my %opts  = @_;
-    return $self->_list("Net::Fastly::Service", %opts);
-}
 
 sub search_services {
     my $self  = shift;

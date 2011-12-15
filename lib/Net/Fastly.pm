@@ -7,15 +7,16 @@ use Net::Fastly::Client;
 use Net::Fastly::Invoice;
 use Net::Fastly::Settings;
 
-our $VERSION = "0.7";
+our $VERSION = "0.9";
 
 
 BEGIN {
   no strict 'refs';
   foreach my $class (qw(Net::Fastly::User     Net::Fastly::Customer
                         Net::Fastly::Backend  Net::Fastly::Director
-                        Net::Fastly::Domain   Net::Fastly::Match
-                        Net::Fastly::Origin   Net::Fastly::Service
+                        Net::Fastly::Domain   Net::Fastly::Healthcheck
+                        Net::Fastly::Match    Net::Fastly::Origin   
+                        Net::Fastly::Service  Net::Fastly::Syslog
                         Net::Fastly::VCL      Net::Fastly::Version)) {
     
     my $file = $class . '.pm';
@@ -25,10 +26,14 @@ BEGIN {
     
     my $name = $class->_path;
         
-    foreach my $method (qw(get create update delete)) {
+    foreach my $method (qw(get create update delete list)) {
         my $code = "sub { shift->_$method('$class', \@_) }";
         my $glob = "${method}_${name}";
         $glob .= "s" if $method eq 'list';
+        # don't create this if it's a list and something isn't listable ...
+        next if $method eq 'list' && !defined $class->_list_path;
+        # or if it already exists (i.e it's been overidden)
+        next if defined *$glob;
         *$glob = eval "$code";
     }
   }  
@@ -206,9 +211,13 @@ sub purge {
 
 =head2 create_domain service_id => <service id>, version => <version number>, name => <name> <opts>
 
+=head2 create_healthcheck service_id => <service id>, version => <version number>, name => <name> <opts>
+
 =head2 create_match service_id => <service id>, version => <version number>, name => <name> <opts>
 
 =head2 create_origin service_id => <service id>, version => <version number>, name => <name> <opts>
+
+=head2 create_syslog service_id => <service id>, version => <version number>, name => <name> <opts>
 
 =head2 create_vcl service_id => <service id>, version => <version number>, name => <name> <opts>
 
@@ -230,9 +239,13 @@ Create new objects.
 
 =head2 get_domain <service id> <version number> <name>
 
+=head2 get_healthcheck <service id> <version number> <name>
+
 =head2 get_match <service id> <version number> <name>
 
 =head2 get_origin <service id> <version number> <name>
+
+=head2 get_syslog <service id> <version number> <name>
 
 =head2 get_vcl <service id> <version number> <name>
 
@@ -259,9 +272,13 @@ Get existing objects.
 
 =head2 update_domain <obj>
 
+=head2 update_healthcheck <obj>
+
 =head2 update_match <obj>
 
 =head2 update_origin <obj>
+
+=head2 update_syslog <obj>
 
 =head2 update_vcl <obj>
 
@@ -292,9 +309,13 @@ Note - you can also do
 
 =head2 delete_domain <obj>
 
+=head2 delete_healthcheck <obj>
+
 =head2 delete_match <obj>
 
 =head2 delete_origin <obj>
+
+=head2 delete_syslog <obj>
 
 =head2 delete_vcl <obj>
 
@@ -308,9 +329,43 @@ Note - you can also do
 
 =cut
 
-=head2 list_services
 
-Get a list of all the services that the current customer has.
+
+=head2 list_users
+
+=head2 list_customers 
+
+=head2 list_versions
+
+=head2 list_services 
+
+=head2 list_backends 
+
+=head2 list_directors 
+
+=head2 list_domains 
+
+=head2 list_healthchecks
+
+=head2 list_matchs 
+
+=head2 list_origins 
+
+=head2 list_syslogs
+
+=head2 list_vcls 
+
+=head2 list_versions 
+
+Get a list of all objects
+
+=head2 list_invoices [<year> <month>]
+
+Return an array of Net::Fastly::Invoice objects representing invoices for all services.
+
+If a year and month are passed in returns the invoices for that whole month. 
+
+Otherwise it returns the invoices for the current month so far.
 
 =head2 search_services <param[s]>
 
@@ -323,16 +378,6 @@ In general you'll want to do
 or
 
         my ($service) = $fastly->search_services(name => $name, version => $number);
-
-=cut
-
-=head2 list_invoices [<year> <month>]
-
-Return an array of Net::Fastly::Invoice objects representing invoices for all services.
-
-If a year and month are passed in returns the invoices for that whole month. 
-
-Otherwise it returns the invoices for the current month so far.
 
 =cut
 
