@@ -37,7 +37,7 @@
    "provides" : {
       "Net::Fastly" : {
          "file" : "lib/Net/Fastly.pm",
-         "version" : "0.95"
+         "version" : "0.96"
       },
       "Net::Fastly::Backend" : {
          "file" : "lib/Net/Fastly/Backend.pm",
@@ -67,6 +67,10 @@
          "file" : "lib/Net/Fastly/Domain.pm",
          "version" : 0
       },
+      "Net::Fastly::Healthcheck" : {
+         "file" : "lib/Net/Fastly/Healthcheck.pm",
+         "version" : 0
+      },
       "Net::Fastly::Invoice" : {
          "file" : "lib/Net/Fastly/Invoice.pm",
          "version" : 0
@@ -91,6 +95,10 @@
          "file" : "lib/Net/Fastly/Settings.pm",
          "version" : 0
       },
+      "Net::Fastly::Syslog" : {
+         "file" : "lib/Net/Fastly/Syslog.pm",
+         "version" : 0
+      },
       "Net::Fastly::UA" : {
          "file" : "lib/Net/Fastly/Client.pm",
          "version" : 0
@@ -109,5 +117,5 @@
       }
    },
    "release_status" : "stable",
-   "version" : "0.95"
+   "version" : "0.96"
 }
