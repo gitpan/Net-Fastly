@@ -2,7 +2,7 @@ package Net::Fastly::Client;
 
 use strict;
 use warnings;
-use JSON;
+use JSON::Any;
 
 =head1 NAME
 
@@ -10,6 +10,21 @@ Net::Fastly::Client - communicate with the Fastly HTTP API
 
 =head1 SYNOPSIS
 
+=head1 PROXYING
+
+There are two ways to proxy:
+
+The first method is to pass a proxy option into the constructor
+
+    my $client = Net::Fastly::Client->new(user => $username, password => $password, proxy => "http://localhost:8080");
+    
+The second is to set your C<https_proxy> environment variable. So, in Bash
+
+    % export https_proxy=http://localhost:8080
+    
+or in CSH or TCSH
+
+    % setenv https_proxy=http://localhost:8080
 
 =head1 METHODS
 
@@ -24,11 +39,22 @@ Create a new Fastly user agent. Options are
 
 =item user 
 
+The login to use
+
 =item password
+
+Your password
 
 =item api_key
 
+Alternatively use the API Key (only some commands are available)
+
+=item proxy
+
+Optionally pass in an https proxy to use.
+
 =back
+
 
 =cut
 sub new {
@@ -38,19 +64,22 @@ sub new {
     
     my $base  = $opts{base_url}  ||= "api.fastly.com";
     my $port  = $opts{base_port} ||= 80;
-    $self->{_ua} = Net::Fastly::Client::UserAgent->new($base, $port);
+    $self->{user} ||= $self->{username};
+    $self->{_json}  = JSON::Any->new;
+    $self->{_ua}    = Net::Fastly::Client::UserAgent->new($base, $port, $opts{proxy});
     
     return $self unless $self->fully_authed;
 
     # If we're fully authed (i.e username and password ) then we need to log in
     my $res = $self->_ua->_post('/login', {}, user => $self->{user}, password => $self->{password});
     die "Unauthorized" unless $res->is_success;
-    my $content = decode_json($res->decoded_content);    
+    my $content = $self->_json->from_json($res->decoded_content);    
     $self->{_cookie} = $res->header('set-cookie');
     return wantarray ? ($self, $content->{user}, $content->{customer}) : $self;
 }
 
-sub _ua { shift->{_ua} }
+sub _ua   { shift->{_ua}   }
+sub _json { shift->{_json} }
 
 =head2 authed
 
@@ -78,7 +107,7 @@ sub _get {
     my %opts = @_;
     my $res  = $self->_ua->_get($path, $self->_headers, %opts);
     return undef if 404 == $res->code;
-    my $content = decode_json($res->decoded_content);
+    my $content = $self->_json->from_json($res->decoded_content);
     _raise_error($content) unless $res->is_success;
     return $content;
 }
@@ -88,8 +117,8 @@ sub _post {
     my $path   = shift;
     my %params = @_;
     
-    my $res    = $self->_ua->_post($path, $self->_headers, %params);
-    my $content = decode_json($res->decoded_content);
+    my $res     = $self->_ua->_post($path, $self->_headers, %params);
+    my $content = $self->_json->from_json($res->decoded_content);
     _raise_error($content) unless $res->is_success;
     return $content;
 }
@@ -99,8 +128,8 @@ sub _put {
     my $path   = shift;
     my %params = @_;
     
-    my $res    = $self->_ua->_put($path, $self->_headers, %params);
-    my $content = decode_json($res->decoded_content);
+    my $res     = $self->_ua->_put($path, $self->_headers, %params);
+    my $content = $self->_json->from_json($res->decoded_content);
     _raise_error($content) unless $res->is_success;
     return $content;
 }
@@ -137,7 +166,15 @@ sub new {
     my $class = shift;
     my $base  = shift;
     my $port  = shift;
-    return bless { _base => $base, _port => $port, _ua => Net::Fastly::UA->new }, $class;
+    my $proxy = shift;
+    my $ua    = Net::Fastly::UA->new;
+    if ($proxy) {
+        $ua->proxy('https', $proxy);
+    } else {
+        $ua->env_proxy;
+    }
+    return bless { _base => $base, _port => $port, _ua => $ua }, $class;
+    
 }
 
 sub _ua { shift->{_ua} }

@@ -12,6 +12,7 @@ WriteMakefile
                  ],
   'VERSION_FROM' => 'lib/Net/Fastly.pm',
   'PREREQ_PM' => {
+                   'YAML' => 0,
                    'Term::ANSIColor' => 0,
                    'File::Spec' => 0,
                    'JSON::XS' => 0,
