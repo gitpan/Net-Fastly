@@ -138,15 +138,20 @@ sub common_tests {
      ok($origin->add_director($director), "Added director to origin");
      
      
-    my $generated2 = eval { $version3->generated_vcl };
+     my $generated2 = eval { $version3->generated_vcl };
      
-     ok($version3->activate, "Activated version");
+     ok($version3->activate,   "Activated version");
+     ok($version3->deactivate, "Deactivated version");
+     ok(!$fastly->get_service($version3->service_id)->version->active, "Version is correctly not active");
+     ok($version3->activate,   "Activated version again");
+     ok($fastly->get_service($version3->service_id)->version->active, "Version is correctly active");
      
-     my $generated = eval { $version3->generated_vcl };
+     
+     my $generated = eval { $version3->generated_vcl(no_content => 1) };
      is($@, '', "Didn't raise an error");
      ok($generated, "Generated VCL is defined");
      ok(!defined $generated->content, "Generate VCL has no content");
-     $generated = $version3->generated_vcl(include_content => 1);
+     $generated = $version3->generated_vcl();
      ok($generated->content, "Generate VCL has content");
      ok($generated->content =~ /\.port = "9092"/msg, "Generated VCL has right port");
      

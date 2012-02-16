@@ -20,16 +20,13 @@ fastly - a command line shell for interacting with the Fastly infrastructure
 
 You can either have a config file in either ~/.fastly or /etc/fastly with
 
-    api_key = <key>
-    
-or a config file with
-
     user     = <login>
     password = <password>
+    
+B<NOTE:> For the time being you must use username and password, not API key. This may change in the future.
 
 Alternatively you can pass in any of those options on the command line
 
-    fastly --api_key  <key>
     fastly --user <login> --password <password>
     
 =head1 PROXYING
@@ -70,6 +67,7 @@ my $term = Term::ShellUI->new(app => "fastly", keep_quotes => 0,  history_file =
  
 print 'Using '.$term->{term}->ReadLine."\n";
 use Term::ANSIColor qw(:constants);
+# precache the list of services
 
 my $basecommands = { 
     "help" => {
@@ -92,6 +90,7 @@ my $basecommands = {
         cmds => {
             service => {
                 desc => "Show a service",
+                doc => "Lists services",
                 minargs => 1,
                 maxargs => 3,
                 args => [\&list_service_complete, sub { ['version'] }, \&list_version],
@@ -146,7 +145,19 @@ my $basecommands = {
                 args => [\&list_service_complete, sub { ['version'] }, \&list_version, \&service_models, \&name_map_complete, \&model_args],
                 proc => \&create,
             },
+            
         },
+    },
+    "add" => {
+        desc => "Add a backend to a director or a director to an origin",
+        cmds => {
+           service => {
+                desc    => "The service name",
+                minargs => 1,
+                args    => [\&list_service_complete, sub { ['version'] }, \&list_version, sub { ['backend', 'director'] }, \&list_target,  sub { ['to'] }, \&list_target_type, \&list_target],
+                proc    => \&add,
+            },
+        }
     },
     "delete" => {
         desc => "Delete an object",
@@ -179,6 +190,17 @@ my $basecommands = {
                 args => [\&list_service_complete, sub { ['version'] }, \&list_version, sub { ['vcl']}, \&list_objects, sub { ['from'] }, sub { ['file'] },
                         sub { shift->complete_files(@_) }, undef],
                 proc => \&upload,
+            }
+        }
+    },
+    "download" => {
+        desc => "Download a vcl file",
+        cmds => {
+            service => {
+                desc    => "The service name",
+                minargs => 5,
+                args => [\&list_service_complete, sub { ['version'] }, \&list_version, sub { ['vcl'] }, \&list_objects, sub { ['to'] }, sub { ['file'] }, undef],
+                proc => \&download,
             }
         }
     },
@@ -218,6 +240,18 @@ my $basecommands = {
             }
         }
     },
+    "deactivate" => {
+        desc => "Deactive a service (note, this makes it not serve)",
+        cmds => {
+            service => {
+                desc    => "The service name",
+                minargs => 1,
+                maxargs => 3,
+                args => [\&list_service_complete, sub { ['version'] }, \&list_version],
+                proc => \&deactivate,
+            }
+        }
+    },
     "purge" => {
         desc => "Remove objects from the cache",
         cmds => {
@@ -226,7 +260,20 @@ my $basecommands = {
                 minargs => 1,
                 maxargs => 1,
                 args => [\&list_service_complete],
-                proc => \&purge,
+                proc => \&purge_service,
+            }, 
+            url => {
+                desc    => "A url",
+                minargs => 1,
+                maxargs => 1,
+                proc    => \&purge_url,
+            },
+            key => {
+                desc    => "The service name",
+                minargs => 3,
+                maxargs => 3,
+                args => [undef, sub { ['service' ] }, \&list_service_complete],
+                proc => \&purge_key,
             }
         }
     },
@@ -248,7 +295,7 @@ my $basecommands = {
 sub who {
     if ($fastly->client->fully_authed) {
         my $user = $fastly->current_user;
-        print "Logged in as ".$user->name." <".$user->login."> of ".$customer->name."\n";
+        print "Logged in as ".$user->name." <".$user->login."> of ".$customer->name."  [". $customer->id ."]\n";
     } else {
         print "Logged with api key as ".$customer->name."\n";
     } 
@@ -282,7 +329,8 @@ sub show_stats {
 
     my $stats = eval { $service->stats($type) }; 
     unless ($stats) {
-        print BOLD, RED, "Error: ", RESET, $@,"\n";
+    my $str = "$@";
+        print BOLD, RED, "Error: ", RESET, $str,"\n";
         return;
     }
 
@@ -362,7 +410,7 @@ sub clone {
     my $version   = $service->version($version_number);
     my $new       = eval { $version->clone };
     if ($@) {
-        print BOLD, RED, "Error: ", RESET, $@,"\n";
+        print_error($@);
     } else {
         print "Version $version_number cloned to ".$new->number."\n";
     }
@@ -377,7 +425,7 @@ sub dump {
     my $version   = $service->version($version_number);
     my $vcl       = eval { $version->generated_vcl };
     if ($@) {
-        print BOLD, RED, "Error: ", RESET, $@,"\n";
+        print_error($@);
     } else {
         print present({$vcl->_as_hash});
     }
@@ -393,7 +441,7 @@ sub validate {
     my $valid      = eval { $version->validate };
     
     if ($@) {
-        print BOLD, RED, "Error: ", RESET, $@,"\n";
+        print_error($@);
     } else {
         print "Config validated\n";
     }
@@ -409,19 +457,58 @@ sub activate {
     my $response   = eval { $version->activate};
     
     if ($@) {
-        print BOLD, RED, "Error: ", RESET, $@,"\n";
+        print_error($@);
     } else {
-        print "Set $service_name version $version_number to active\n";
+        print "Set $service_name version ".$version->number." to active\n";
     }
 }
 
-sub purge {
+sub deactivate {
+    my $service_name   = shift;
+    shift;
+    my $version_number = shift;
+
+    my ($service)  = $fastly->search_services(name => $service_name);
+    my $version    = $service->version($version_number);
+    my $response   = eval { $version->deactivate};
+    
+    if ($@) {
+        print_error($@);
+    } else {
+        print "Service $service_name version ".$version->number." has been deactivated.\n";
+    }
+}
+
+sub purge_service {
     my $service_name = shift;
     my $version      = shift;
     my ($service)    = $fastly->search_services(name => $service_name);
     my $ok           = eval { $service->purge_all };
     if ($@) {
-        print BOLD, RED, "Error: ", RESET, $@,"\n";
+        print_error($@);
+    } else {
+        print "Purged\n";
+    }
+}
+
+sub purge_url {
+    my $url = shift;
+    my $ok  = eval { $fastly->purge($url) };
+    if ($@) {
+        print_error($@);
+    } else {
+        print "Purged\n";
+    }
+}
+
+sub purge_key {
+    my $key          = shift;
+    shift;
+    my $service_name = shift;
+    my ($service)    = $fastly->search_services(name => $service_name);
+    my $ok           = eval { $service->purge_by_key($key) };
+    if ($@) {
+        print_error($@);
     } else {
         print "Purged\n";
     }
@@ -435,9 +522,9 @@ sub diff {
     shift;
     my $to_version = shift;
     my $from = eval { $fastly->search_services(name => $service_name, version => $from_version) };
-    if ($@) { print BOLD, RED, "Error: ", RESET, $@,"\n"; return };
+    if ($@) { print_error($@); }
     my $to = eval { $fastly->search_services(name => $service_name, version => $to_version) };
-    if ($@) { print BOLD, RED, "Error: ", RESET, $@,"\n"; return };
+    if ($@) { print_error($@); }
     
     if ($to->{type} eq 'error') { print BOLD, RED, "Error: ", RESET, $to->{data}->{error},"\n"; return };
 
@@ -462,16 +549,18 @@ sub set {
 
     my $service  = eval { $fastly->search_services(name => $service_name ) };
     if ($@ || !$service) {
-        print BOLD, RED, "Error finding service $service_name: ", RESET, $@,"\n";
+    my $str = "$@";
+        print BOLD, RED, "Error finding service $service_name: ", RESET, $str,"\n";
         return;
     }
 
     my $name     = shift;
    
-    my $method = "get_$type"; 
-    my $obj    =  eval { $fastly->$method( service => $service->id, version => $version, name => $name) };
+    my $method = "get_$type";; 
+    my $obj    =  eval { $fastly->$method($service->id, $version, $name) };
     if ($@ || !$obj) {
-        print BOLD, RED, "Error finding $type $name: ", RESET, $@,"\n";
+    my $str = "$@";
+        print BOLD, RED, "Error finding $type $name: ", RESET, $str,"\n";
         return;
     }
 
@@ -491,7 +580,7 @@ sub set {
     $method = "update_$type"; 
     my $o = eval { $fastly->$method($obj) };
     if ($@) {
-        print BOLD, RED, "Error updating $type: ", RESET, $@,"\n";
+        print_error($@);
     } else {
         print "Update successful\n";
     }
@@ -518,16 +607,23 @@ sub set {
 # # }
 # 
 
+
+sub print_error {
+    my $error = shift;
+    chomp($error);
+    print BOLD, RED, "Error: ", RESET, RED, $error . RESET . "\n";
+}
+
 sub upload {
     my $service_name = shift;
     shift;
     my $version_num  = shift;
     my $type    = shift;
-    my $file    = shift;
+    my $name    = shift;
     shift;
     shift;
-    my $name    = shift || basename($file, ".vcl");
-    
+    my $file    = shift || basename($name);
+
     local($/);
     open(my $fh, "<$file") || die "No file '$file'";
     my $data = <$fh>;
@@ -536,12 +632,52 @@ sub upload {
     eval {
         my $service = $fastly->search_services(name => $service_name);
         my $version = $service->version($version_num);
-        my $r       = $version->upload_vcl($name, $data);
+    #XXX eats error
+        my $vcl     = eval { $version->vcl($name) };
+        my $r;
+        if ($vcl) {
+          $vcl->content($data);
+          $r = $vcl->save;
+        } else {
+          $r = $version->upload_vcl($name, $data);
+        }
     };
     if ($@) {
-        print BOLD, RED, "Error: ", RESET, $@,"\n";
+        print_error($@);
     } else {
         print "Uploaded $file as $name to service $service_name version $version_num\n";
+    }
+    return;
+}
+
+sub download {
+    my $service_name = shift;
+    shift;
+    my $version_num  = shift;
+    my $type    = shift;
+    my $name    = shift;
+    shift;
+    my $tmp     = shift; # so that people can do 'download service <id> version <num> vcl <name> to <file>' as well
+    my $file    = shift || $tmp || $name;
+
+    my $dir     = dirname($file);
+    $file       = join "/", ($dir, basename($file, ".vcl").".vcl"); # ensure there's a .vcl ending
+
+    
+
+    eval {
+        my $service = $fastly->search_services(name => $service_name);
+        my $version = $service->version($version_num);
+        my $vcl     = eval { $version->vcl($name, include_content => 1) };
+        die "Couldn't find the vcl named $name" unless $vcl;
+        open(my $fh, ">$file") || die "Couldn't open the file '$file': $!";
+        print $fh $vcl->content;
+        close($fh);
+    };
+    if ($@) {
+        print_error($@);
+    } else {
+        print "Downloaded service $service_name version $version_num vcl $name to $file\n";
     }
     return;
 }
@@ -551,7 +687,7 @@ sub delete {
     my $name    = shift @args;
     my $service = eval { $fastly->search_services(name => $name) };
     if ($@) {
-        print BOLD, RED, "Error: ", RESET, $@,"\n";
+        print_error($@);
         return;
     }
         
@@ -569,17 +705,41 @@ sub delete {
         print RED, "Need version", RESET, "\n";
         return;
     }
+    shift @args;
     my $version = shift @args;
     my $type    = shift @args;
     my $tname   = shift @args;
     my $meth    = "delete_$type";
-    my $r       = eval { $fastly->$meth(service => $service->id, version => $version, name => $tname ) };
+    my $r       = eval { $fastly->$meth({ service_id => $service->id, version => $version, name => $tname }) };
     if ($@) {
-       print BOLD, RED, "Error: ", RESET, $@,"\n";
+        print_error($@);
     } else {
        print "Deleted $type $tname\n";
     }
     return;
+}
+
+sub add {
+    my @args            = @_;
+    my $service_name    = $args[0];
+    my $version_num     = $args[2];
+    my $dest_type       = $args[6];
+    my $dest_name       = $args[7];
+    my $src_type        = $args[3];
+    my $src_name        = $args[4];
+    my $service         = eval { $fastly->search_services(name => $service_name) };
+    my $src_meth        = "get_${src_type}";
+    my $src             = $fastly->$src_meth($service->id, $version_num, $src_name);
+    my $dest_meth       = "get_${dest_type}";
+    my $dest            = $fastly->$dest_meth($service->id, $version_num, $dest_name);
+    my $add_meth        = "add_${src_type}";
+    
+    my $out = eval { $dest->$add_meth($src) };
+    if ($@) {
+        print_error($@);
+    } else {
+        warn "Added $src_type ".$src->name." to $dest_type ".$dest->name." for service ".$service->name." v${version_num}\n";
+    }
 }
 
 sub create {
@@ -588,7 +748,7 @@ sub create {
     if (!@args) {
         my $service = eval { $fastly->create_service(name => $name ) };
         if ($@) {
-            print BOLD, RED, "Error: ", RESET, $@,"\n";
+            print_error($@);
         } else {
             print "Created service ".$service->id."\n";
         }
@@ -618,9 +778,9 @@ sub create {
     }
 
     my $meth = "create_$type"; 
-    my $obj  = eval { $fastly->$meth(service => $service->id, version => $version, @args) };
+    my $obj  = eval { $fastly->$meth(service_id => $service->id, version => $version, @args) };
     if ($@) {
-        print BOLD, RED, "Error: ", RESET, $@,"\n";
+        print_error($@);
     } else {
         warn present({$obj->_as_hash});
     }
@@ -635,9 +795,9 @@ sub list_objects {
     my $version_num  = $args[2];
     my $type         = $args[3];
     my ($service)    = $fastly->search_services(name => $service_name, version => $version_num);
-    my $meth         = "list_$type";
-    my @objects      = $fastly->$meth( service => $service->id );
-    return [map { $_->name } @objects];
+    my $meth         = "list_$type" . "s";
+    my @objects      = $fastly->$meth( service_id => $service->id , version => $version_num);
+    return [sort map { $_->name } @objects];
 }
 
 
@@ -647,6 +807,9 @@ sub model_args {
     my $commands = $fastly->commands;
     my $cmd      = $commands->{"$c->{args}->[3].create"};
     my @args     = @{$c->{args}};
+    use Data::Dumper;
+    warn Dumper $cmd;
+    warn Dumper \@args;
 
     my %seen;
     my $i = 0;
@@ -686,6 +849,8 @@ sub model_args {
         } 
     }
     my @r;
+    use Data::Dumper;
+    warn Dumper $cmd;
     foreach my $c (sort {$a cmp $b} keys %$cmd) {
         next if ($c eq 'name' || $c eq 'service' || $c eq 'version');
         next if ($seen{$c});
@@ -695,24 +860,36 @@ sub model_args {
     return \@r;
 }
 
+our %_mappings;
+sub _mappings {
+    return %_mappings if keys %_mappings;
+    foreach my $class (@Net::Fastly::CLASSES) {
+        my $name = lc $class;
+        $name    =~ s/^net::fastly:://;
+        $_mappings{$name} = $class;
+    }
+    %_mappings
+}
 
 sub service_models {
     my $t = shift;
     my $c = shift; 
-    my $commands = eval { $fastly->commands };
+    my %mapping = _mappings;
     if ($@) {
-        $t->completemsg(sprintf("\n%s%s%s\n", RED, $@, RESET));
+        my $string = "$@";  #copy becuase RED can reset it
+        $t->completemsg(sprintf("\n%s%s%s\n", RED, $string, RESET));
         return [];
     }
     my @options;
-    foreach my $command (keys %$commands) {
-        if ($command =~/(\w+).create/) { 
-            next if ($1 eq 'service');
-            next if ($1 eq 'version');
-            push @options, $1;
-        }
+    foreach my $name (keys %_mappings) {
+        next if ($name eq 'service');
+        next if ($name eq 'version');
+        push @options, $name;
     }
-    return \@options;
+    if (defined($c->{str}) && $c->{str} ne "") {
+        return [ grep { $_ =~ /^$c->{str}/} sort @options ];
+    }
+    return [sort @options];
 }
 
 
@@ -744,11 +921,14 @@ sub show_services {
 sub list_service_complete {
     my $t = shift;
     my $c = shift; 
-
     my @services = $fastly->list_services;
+    if (defined($c->{str}) && $c->{str} ne "") {
+        my $match  = lc($c->{str});
+        return [ grep { lc($_) =~ /^$match/ } sort map { $_->name } @services ];
+    } else {
+        return [ sort map { $_->name } @services ]
+    }
 
-    my $match  = lc($c->{str});
-    return [ grep { lc($_) =~ /^$match/ } map { $_->name } @services ];
 
     #my $substr = 0;
     #if ($c->{str}) {
@@ -763,12 +943,50 @@ sub list_version {
     my $c = shift;
     my $service_name    = $c->{args}->[0];
     my ($service)       = $fastly->search_services(name => $service_name);
-    return sort { $a->number <=> $b->number } $service->versions;
+    return [sort {$a <=> $b} map { $_->number } $service->versions];
 }
+
+sub list_target {
+    my $t = shift;
+    my $c = shift;
+    my $service_name    = $c->{args}->[0];
+    my $version_num     = $c->{args}->[2];
+    my $type            = $c->{args}->[6] || $c->{args}->[3];
+    my $version         = _get_details($service_name, $version_num); 
+    return [] unless $version;
+    my $objs = $version->{"${type}s"} || [];
+    return [ map { $_->{name} } @$objs ];
+}
+
+sub list_target_type {
+    my $t = shift;
+    my $c = shift;
+    my $service_name    = $c->{args}->[0];
+    my $version_num     = $c->{args}->[2];
+    my $type            = $c->{args}->[3];
+    if ($type eq "backend") {
+        return ["director"];
+    } elsif ($type eq "director") {
+        return ["origin"];
+    } else {
+        return [];
+    }
+}
+
+
 
 sub present {
     my $obj = shift;
     Dump($obj);
+}
+
+sub _get_details {
+    my $service_name = shift;
+    my $version_num  = shift;
+    my ($service)       = $fastly->search_services(name => $service_name);
+    return undef unless $service;
+    my $details         = $service->details(version => $version_num);
+    return $details->{version};
 }
 
 

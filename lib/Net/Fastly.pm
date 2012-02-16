@@ -7,18 +7,18 @@ use Net::Fastly::Client;
 use Net::Fastly::Invoice;
 use Net::Fastly::Settings;
 
-our $VERSION = "0.97";
-
+our $VERSION = "0.98";
 
 BEGIN {
   no strict 'refs';
-  foreach my $class (qw(Net::Fastly::User     Net::Fastly::Customer
-                        Net::Fastly::Backend  Net::Fastly::Director
-                        Net::Fastly::Domain   Net::Fastly::Healthcheck
-                        Net::Fastly::Match    Net::Fastly::Origin   
-                        Net::Fastly::Service  Net::Fastly::Syslog
-                        Net::Fastly::VCL      Net::Fastly::Version)) {
-    
+  our @CLASSES = qw(Net::Fastly::User     Net::Fastly::Customer
+                    Net::Fastly::Backend  Net::Fastly::Director
+                    Net::Fastly::Domain   Net::Fastly::Healthcheck
+                    Net::Fastly::Match    Net::Fastly::Origin   
+                    Net::Fastly::Service  Net::Fastly::Syslog
+                    Net::Fastly::VCL      Net::Fastly::Version);
+
+  foreach my $class (@CLASSES) {
     my $file = $class . '.pm';
     $file =~ s{::}{/}g;
     CORE::require($file); 
@@ -59,9 +59,8 @@ Net::Fastly - client library for interacting with the Fastly web acceleration se
     print "Which has the owner ".$customer->owner->name."\n";
     
     # Let's see which services we have defined
-    foreach my $service ($customer->list_services) {
-        print $service->id."\n";
-        print $service->name."\n";
+    foreach my $service ($fastly->list_services) {
+        print $service->name." (".$service->id.")\n";
         foreach my $version ($service->versions) {
             print "\t".$version->number."\n";
         }
@@ -148,11 +147,13 @@ sub authed { shift->client->authed }
 Whether or not we're fully (username and password) authed
 
 =cut
-sub fully_authed { shift->client->authed }
+sub fully_authed { shift->client->fully_authed }
 
 =head2 current_user 
 
 Return a User object representing the current logged in user.
+
+This will not work if you're logged in with an API key.
 
 =cut
 sub current_user {
@@ -168,7 +169,7 @@ Return a Customer object representing the customer of the current logged in user
 =cut
 sub current_customer {
     my $self = shift;
-    die "You must be fully authed to get the current customer" unless $self->fully_authed;
+    die "You must be authed to get the current customer" unless $self->authed;
     $self->{_current_customer} ||= $self->_get("Net::Fastly::Customer");
 }
 
@@ -181,7 +182,8 @@ Useful for information.
 =cut
 sub commands {
     my $self     = shift;
-    return eval { $self->client->_get('/commands') };
+    return $self->{__cache_commands} if ($self->{__cache_commands});
+    return eval { $self->{__cache_commands} = $self->client->_get('/commands') };
 }
 
 =head2 purge <path>
@@ -192,7 +194,6 @@ Purge the specified path from your cache.
 sub purge {
     my $self = shift;
     my $path = shift;
-    die "You must be authed to purge" unless $self->authed;
     $self->client->_post("/purge/$path");
 }
 
@@ -381,12 +382,12 @@ or
 
 =cut
 
+use Carp;
 sub _list {
     my $self     = shift;
     my $class    = shift;
     my %opts     = @_;
-    die "You must be fully authed to list a $class" unless $self->fully_authed;
-    my $list     = $self->client->_get($class->_list_path, %opts);
+    my $list     = $self->client->_get($class->_list_path(%opts), %opts);
     return () unless $list;
     return map { $class->new($self, %$_) } @$list;
 }
@@ -394,11 +395,9 @@ sub _list {
 sub _get {
     my $self  = shift;
     my $class = shift;
-    my @args  = @_;
-    die "You must be fully authed to get a $class" unless $self->fully_authed;
     my $hash;
-    if (@args) {
-        $hash = $self->client->_get($class->_get_path(@args));
+    if (@_) {
+        $hash = $self->client->_get($class->_get_path(@_));
     } else {
         $hash = $self->client->_get("/current_".$class->_path);
     }
@@ -410,7 +409,6 @@ sub _create {
     my $self  = shift;
     my $class = shift;
     my %args  = @_;
-    die "You must be fully authed to create a $class" unless $self->fully_authed;
     my $hash  = $self->client->_post($class->_post_path(%args), %args);
     return $class->new($self, %$hash);
 }
@@ -419,7 +417,6 @@ sub _update {
     my $self  = shift;
     my $class = shift;
     my $obj   = shift;
-    die "You must be fully authed to update a $class" unless $self->fully_authed;
     my $hash  = $self->client->_put($class->_put_path($obj), $obj->_as_hash);
     return $class->new($self, %$hash);
 }
@@ -428,7 +425,7 @@ sub _delete {
     my $self  = shift;
     my $class = shift;
     my $obj   = shift;
-    die "You must be fully authed to delete a $class" unless $self->fully_authed;
+    $obj      = bless $obj, $class if 'HASH' eq ref($obj);
     return defined $self->client->_delete($class->_delete_path($obj));
 }
 

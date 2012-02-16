@@ -13,13 +13,17 @@ WriteMakefile
   'VERSION_FROM' => 'lib/Net/Fastly.pm',
   'PREREQ_PM' => {
                    'YAML' => 0,
+                   'URI' => 0,
                    'Term::ANSIColor' => 0,
+                   'IO::Socket::SSL' => '1.54',
+                   'URI::Escape' => 0,
                    'File::Spec' => 0,
                    'JSON::XS' => 0,
                    'Class::Accessor::Fast' => 0,
                    'Test::More' => 0,
                    'LWP::UserAgent' => '6.02',
                    'Term::ShellUI' => 0,
+                   'LWP::Protocol::https' => 0,
                    'File::Temp' => 0,
                    'File::Basename' => 0,
                    'JSON::Any' => 0

@@ -67,7 +67,6 @@ sub new {
     $self->{user} ||= $self->{username};
     $self->{_json}  = JSON::Any->new;
     $self->{_ua}    = Net::Fastly::Client::UserAgent->new($base, $port, $opts{proxy});
-    
     return $self unless $self->fully_authed;
 
     # If we're fully authed (i.e username and password ) then we need to log in
@@ -107,8 +106,8 @@ sub _get {
     my %opts = @_;
     my $res  = $self->_ua->_get($path, $self->_headers, %opts);
     return undef if 404 == $res->code;
+    $self->_raise_error($res) unless $res->is_success;
     my $content = $self->_json->from_json($res->decoded_content);
-    _raise_error($content) unless $res->is_success;
     return $content;
 }
 
@@ -118,8 +117,8 @@ sub _post {
     my %params = @_;
     
     my $res     = $self->_ua->_post($path, $self->_headers, %params);
+    $self->_raise_error($res) unless $res->is_success;
     my $content = $self->_json->from_json($res->decoded_content);
-    _raise_error($content) unless $res->is_success;
     return $content;
 }
 
@@ -129,17 +128,17 @@ sub _put {
     my %params = @_;
     
     my $res     = $self->_ua->_put($path, $self->_headers, %params);
+    $self->_raise_error($res) unless $res->is_success;
     my $content = $self->_json->from_json($res->decoded_content);
-    _raise_error($content) unless $res->is_success;
     return $content;
 }
 
 sub _delete {
     my $self = shift;
     my $path = shift;
-    
     my $res  = $self->_ua->_delete($path, $self->_headers);
-    return $res->is_success;
+    $self->_raise_error($res) unless $res->is_success;
+    return 1;
 }
 
 sub _headers {
@@ -150,8 +149,12 @@ sub _headers {
 }
 
 sub _raise_error {
-    my $content = shift;
-    die "".$content->{msg}."\n";
+    my $self = shift;
+    my $res  = shift;
+
+    my $content = eval { $self->_json->from_json($res->decoded_content) };
+    my $message = $content ? $content->{detail} || $content->{msg} : $res->status_line."  ".$res->decoded_content;
+    die "$message\n";
 }
 
 
@@ -206,7 +209,7 @@ sub _put {
     my $url     = $self->_make_url($path);
     my $uri     = URI->new('http');
     $uri->query_form(_make_params(%params));
-    return $self->_ua->request(PUT $url, %$headers, Content => $uri->query); 
+    return $self->_ua->request(PUT $url, %$headers, Content => $uri->query || ""); 
 }
 
 sub _delete {
@@ -225,9 +228,10 @@ sub _make_url {
     my $path   = shift;
     my %params = @_;
 
-    $base =~ s!^(https?:)//!!;
-    my $prot = $1 || "https:";
-
+    my $prot = "https:";
+    if ($base =~ s!^(https?:)//!!) {
+	$prot = $1;
+    }
     my $url = URI->new($prot);
     $url->host($base);
     $url->port($port) if $port != 80;

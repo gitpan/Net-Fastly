@@ -25,12 +25,16 @@
             "File::Basename" : 0,
             "File::Spec" : 0,
             "File::Temp" : 0,
+            "IO::Socket::SSL" : "1.54",
             "JSON::Any" : 0,
             "JSON::XS" : 0,
+            "LWP::Protocol::https" : 0,
             "LWP::UserAgent" : "6.02",
             "Term::ANSIColor" : 0,
             "Term::ShellUI" : 0,
             "Test::More" : 0,
+            "URI" : 0,
+            "URI::Escape" : 0,
             "YAML" : 0
          }
       }
@@ -38,7 +42,7 @@
    "provides" : {
       "Net::Fastly" : {
          "file" : "lib/Net/Fastly.pm",
-         "version" : "0.97"
+         "version" : "0.98"
       },
       "Net::Fastly::Backend" : {
          "file" : "lib/Net/Fastly/Backend.pm",
@@ -118,5 +122,5 @@
       }
    },
    "release_status" : "stable",
-   "version" : "0.97"
+   "version" : "0.98"
 }
