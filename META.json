@@ -42,7 +42,7 @@
    "provides" : {
       "Net::Fastly" : {
          "file" : "lib/Net/Fastly.pm",
-         "version" : "0.98"
+         "version" : "0.99"
       },
       "Net::Fastly::Backend" : {
          "file" : "lib/Net/Fastly/Backend.pm",
@@ -122,5 +122,5 @@
       }
    },
    "release_status" : "stable",
-   "version" : "0.98"
+   "version" : "0.99"
 }

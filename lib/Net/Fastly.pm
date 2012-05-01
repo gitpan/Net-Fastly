@@ -7,7 +7,7 @@ use Net::Fastly::Client;
 use Net::Fastly::Invoice;
 use Net::Fastly::Settings;
 
-our $VERSION = "0.98";
+our $VERSION = "0.99";
 
 BEGIN {
   no strict 'refs';
@@ -134,6 +134,22 @@ Get the current Net::Fastly::Client
 
 =cut
 sub client { shift->{_client} }
+
+=head2 set_customer <customer id>
+
+Set the current customer to act as.
+
+B<NOTE>: this will only work if you're an admin
+
+=cut
+sub set_customer {
+    my $self = shift;
+    my $id   = shift;
+    die "You must be fully authed to set the customer" unless $self->fully_authed;
+    die "You must be an admin to set the customer" unless $self->current_user->can_do('admin');
+    delete $self->{_current_customer};
+    $self->client->set_customer($id);
+}
 
 =head2 authed
 
@@ -482,8 +498,14 @@ sub get_options {
         %options = load_options($config);
         last;
     }
-    while (@ARGV && $ARGV[0] =~ m!^-+(\w+)\=(\w+)$!) {
-        $options{$1} = $2;
+    while (@ARGV && $ARGV[0] =~ m!^-+(\w+)\=(.+)$!) {
+        if ($1 eq "config") {
+            die "No such file '$2'" unless -f $2;
+            my %tmp = load_options($2);
+            $options{$_} = $tmp{$_} for keys %tmp;
+        } else {
+            $options{$1} = $2;
+        }
         shift @ARGV;
     }
     die "Couldn't find options from command line arguments or ".join(", ", @configs)."\n" unless keys %options;
