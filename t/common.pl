@@ -21,7 +21,7 @@ sub common_tests {
     ok($settings, "Settings is defined");
     is($settings->service_id, $service->id, "Service id is the same");
     is($settings->version, $version->number, "Version number is the same");
-
+    
     my $default_ttl = $settings->settings->{'general.default_ttl'};
     $settings       = eval { $version->settings };
     is($@, '', "Didn't raise an error");
@@ -32,7 +32,7 @@ sub common_tests {
 
     $settings->settings->{'general.default_ttl'} = $default_ttl = 888_888_888;
     $settings->save;
-
+    
     $settings       = eval { $version->settings };
     is($settings->settings->{'general.default_ttl'}, $default_ttl, "Default TTL is the same");
 
@@ -94,7 +94,7 @@ sub common_tests {
     #is($backend->hostname, 'thegestalt.org', "Got the updated hostname");
     is($backend->port, 9092, "Got the updated port");
     
-    my $domain_name = "fastly-test-domain-".get_rand."-example.com";
+     my $domain_name = "fastly-test-domain-".get_rand."-example.com";
      my $domain      = eval { $fastly->create_domain(service_id => $service->id, version => $number, name => $domain_name) };
      is($@, '', "Didn't raise an error");
      ok($domain, "Domain is defined");
@@ -145,8 +145,7 @@ sub common_tests {
      ok(!$fastly->get_service($version3->service_id)->version->active, "Version is correctly not active");
      ok($version3->activate,   "Activated version again");
      ok($fastly->get_service($version3->service_id)->version->active, "Version is correctly active");
-     
-     
+          
      my $generated = eval { $version3->generated_vcl(no_content => 1) };
      is($@, '', "Didn't raise an error");
      ok($generated, "Generated VCL is defined");
@@ -158,10 +157,18 @@ sub common_tests {
      my $valid = eval { $version3->validate };
      is($@, '', "Didn't raise an error");
      ok($valid, "Version3 is valid");
+
+     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+     $year += 1900;
+     $mon   = 12 if $mon == 0;
      
-     my %stats       = $service->stats;
+     my %stats = eval { $service->stats };
+     like($@, qr/unbounded/i, "Correctly raised an unbounded stats error");
+     %stats = eval { $service->stats('all', year => $year, month => $mon) };
+     is($@, '', "Didn't raise an error");
      ok(keys %stats, "Got stats");
      
+
      my $invoice     = $service->invoice;
      is($@, '', "Didn't raise an error");
      is(ref($invoice), "Net::Fastly::Invoice", "Got invoice");
@@ -174,9 +181,7 @@ sub common_tests {
      is(ref($invoice), "Net::Fastly::Invoice", "Got an invoice object");
      
      
-     my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
-     $year += 1900;
-     $mon   = 12 if $mon == 0;
+
      $invoice = $fastly->get_invoice($year, $mon);
      is(ref($invoice), "Net::Fastly::Invoice", "Got an invoice object");
      # is($invoice->start->year,  $year,  "Got the correct service start year");
