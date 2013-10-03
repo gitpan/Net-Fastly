@@ -4,9 +4,9 @@
       "unknown"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.4005, CPAN::Meta::Converter version 2.112621",
+   "generated_by" : "Module::Build version 0.4007, CPAN::Meta::Converter version 2.120351",
    "license" : [
-      "unknown"
+      "perl_5"
    ],
    "meta-spec" : {
       "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
@@ -20,29 +20,30 @@
          }
       },
       "runtime" : {
+         "recommends" : {
+            "Term::ANSIColor" : "0",
+            "Term::ShellUI" : "0"
+         },
          "requires" : {
-            "Class::Accessor::Fast" : 0,
-            "File::Basename" : 0,
-            "File::Spec" : 0,
-            "File::Temp" : 0,
-            "IO::Socket::SSL" : "1.54",
-            "JSON::Any" : 0,
-            "JSON::XS" : 0,
-            "LWP::Protocol::https" : 0,
-            "LWP::UserAgent" : "6.02",
-            "Term::ANSIColor" : 0,
-            "Term::ShellUI" : 0,
-            "Test::More" : 0,
-            "URI" : 0,
-            "URI::Escape" : 0,
-            "YAML" : 0
+            "Class::Accessor::Fast" : "0",
+            "File::Basename" : "0",
+            "File::Spec" : "0",
+            "File::Temp" : "0",
+            "IO::Socket::SSL" : 0,
+            "JSON::XS" : "0",
+            "LWP::Protocol::https" : "0",
+            "LWP::UserAgent" : "5.813",
+            "Test::More" : "0",
+            "URI" : "0",
+            "URI::Escape" : "0",
+            "YAML" : "0"
          }
       }
    },
    "provides" : {
       "Net::Fastly" : {
          "file" : "lib/Net/Fastly.pm",
-         "version" : "0.99"
+         "version" : "1.01"
       },
       "Net::Fastly::Backend" : {
          "file" : "lib/Net/Fastly/Backend.pm",
@@ -58,6 +59,10 @@
       },
       "Net::Fastly::Client::UserAgent" : {
          "file" : "lib/Net/Fastly/Client.pm",
+         "version" : 0
+      },
+      "Net::Fastly::Condition" : {
+         "file" : "lib/Net/Fastly/Condition.pm",
          "version" : 0
       },
       "Net::Fastly::Customer" : {
@@ -100,6 +105,10 @@
          "file" : "lib/Net/Fastly/Settings.pm",
          "version" : 0
       },
+      "Net::Fastly::Stats" : {
+         "file" : "lib/Net/Fastly/Stats.pm",
+         "version" : 0
+      },
       "Net::Fastly::Syslog" : {
          "file" : "lib/Net/Fastly/Syslog.pm",
          "version" : 0
@@ -122,5 +131,13 @@
       }
    },
    "release_status" : "stable",
-   "version" : "0.99"
+   "resources" : {
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ],
+      "repository" : {
+         "url" : "https://github.com/fastly/fastly-perl"
+      }
+   },
+   "version" : "1.01"
 }

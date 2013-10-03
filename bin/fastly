@@ -8,6 +8,18 @@ use Data::Dumper;
 use POSIX qw(strftime);
 use YAML;
 
+BEGIN {
+    eval {
+      require Term::ShellUI;
+      Term::ShellUI->import();
+      require Term::ANSIColor;
+      Term::ANSIColor->import(qw(:constants));
+  
+    };
+
+    die "You must install Term::ShellUI and Term::ANSIColorin order to run the Fastly shell\n" if $@;
+}
+
 =head1 NAME
 
 fastly - a command line shell for interacting with the Fastly infrastructure
@@ -59,13 +71,13 @@ my $fastly = Net::Fastly->new(%opts);
 
 my $customer = $fastly->current_customer;
 
-use Term::ShellUI;
+
+
 my $term = Term::ShellUI->new(app => "fastly", keep_quotes => 0,  history_file => $ENV{HOME}."/.fastly_history", prompt => "fastly> ");
           
 #$term->{debug_complete}=5;
  
 print 'Using '.$term->{term}->ReadLine."\n";
-use Term::ANSIColor qw(:constants);
 # precache the list of services
 
 my $basecommands = { 

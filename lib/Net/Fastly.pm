@@ -7,7 +7,7 @@ use Net::Fastly::Client;
 use Net::Fastly::Invoice;
 use Net::Fastly::Settings;
 
-our $VERSION = "1.0";
+our $VERSION = "1.01";
 
 BEGIN {
   no strict 'refs';
@@ -617,9 +617,13 @@ sub get_options {
     return %options;
 }
 
-=head1 COPYRIGHT
+=head1 COPYING
 
 Copyright 2011 - Fastly Inc
+
+Distributed under the same terms as Perl itself.
+
+=head1 SUPPORT 
 
 Mail support at fastly dot com if you have problems.
 
