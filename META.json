@@ -43,7 +43,7 @@
    "provides" : {
       "Net::Fastly" : {
          "file" : "lib/Net/Fastly.pm",
-         "version" : "1.01"
+         "version" : "1.02"
       },
       "Net::Fastly::Backend" : {
          "file" : "lib/Net/Fastly/Backend.pm",
@@ -139,5 +139,5 @@
          "url" : "https://github.com/fastly/fastly-perl"
       }
    },
-   "version" : "1.01"
+   "version" : "1.02"
 }

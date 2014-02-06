@@ -1,5 +1,6 @@
 use strict;
 use Test::More tests => 30; 
+use lib qw(t);
 use Helper;
 use Data::Dumper;
 
@@ -12,7 +13,7 @@ SKIP: {
     
 #$Net::Fastly::UA::DEBUG=1;
 
-skip "No api key credentials given - $err", 101 if $err;
+skip "No api key credentials given - $err", 30 if $err;
 
 my $fastly   = Net::Fastly->new(%opts);
 
